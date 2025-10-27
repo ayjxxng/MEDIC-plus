@@ -127,13 +127,6 @@ class DomainBayesWeighter:
         self.mean = torch.zeros(num_domains, dtype=torch.float32, device=device)
         self.var = torch.full((num_domains,), float(init_var), dtype=torch.float32, device=device)
         self.num_domains = num_domains
-        self.log_domain_scale = None
-
-    def attach_learnable_scale(self, device='cpu', init_log=0.0):
-        self.log_domain_scale = torch.nn.Parameter(
-            torch.full((self.num_domains,), float(init_log), dtype=torch.float32, device=device)
-        )
-        return self.log_domain_scale
 
     def update_and_get_tau_per_step(self, grads_history, step_domains):
         flat = [_flatten_grad_list(g) for g in grads_history]
@@ -159,9 +152,6 @@ class DomainBayesWeighter:
                 self.var.index_copy_(0, idx, new_var.clamp_min(1e-12))
 
         tau_d = 1.0 / self.var.clamp_min(1e-12)
-
-        if self.log_domain_scale is not None:
-            tau_d = tau_d * torch.exp(self.log_domain_scale)
 
         tau_step = []
         for ds in step_domains:
@@ -203,12 +193,6 @@ def accumulate_meta_grads_arith_prob(
     if "bw" not in _bayes_state:
         _bayes_state["bw"] = DomainBayesWeighter(domain_count, ema=bayes_ema, device=device)
     bw = _bayes_state["bw"]
-
-    if learnable_domain_scale:
-        if getattr(bw, "log_domain_scale", None) is None:
-            log_phi = bw.attach_learnable_scale(device=device, init_log=0.0)
-            if optimizer is not None:
-                optimizer.add_param_group({"params": [log_phi], "lr": domain_scale_lr})
 
     w = _compute_probabilistic_arith_weights(
         grads_history, beta=beta, target_sum=target_sum,
