@@ -97,7 +97,7 @@ def get_args():
 
     #============= Note: Custum arg.
     parser.add_argument('--domain-shuffle', default='true')  # true, false
-    parser.add_argument('--bayes-ema', type=float, default=0.9)  # EMA coeff.
+    parser.add_argument('--bayes-ema', type=float, default=0.95)  # EMA coeff.
     parser.add_argument('--beta', type=float, default=0.4)
     parser.add_argument('--learnable-domain-scale', action='store_true')
     parser.add_argument('--domain-scale-lr', type=float, default=None)
