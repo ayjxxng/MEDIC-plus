@@ -13,8 +13,6 @@ from util.iterator import *
 from train.ml import *
 import types
 
-
-
 if __name__ == '__main__':
 
     logger = Logger(log_path)
@@ -23,7 +21,7 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    with open(param_path, 'wb') as f: 
+    with open(param_path, 'wb') as f:
         pickle.dump(vars(args), f, protocol=pickle.HIGHEST_PROTOCOL)
 
     logger.log('Loading dataset...')
@@ -45,7 +43,6 @@ if __name__ == '__main__':
     classes_partition = split_classes(classes_list=known_classes, index_list=class_index_list, n=num_group)
     group_length_list = [len(g) for g in classes_partition]
 
-
     logger.log_params(
         GPU=gpu,
         SaveName=save_name,
@@ -59,6 +56,13 @@ if __name__ == '__main__':
         NumGroups=num_group,
         BatchSize=batch_size,
         Algorithm=algorithm,
+        # ==== Note: Add
+        DomainShuffle=domain_shuffle,
+        BayesEMA=bayes_ema,
+        BayesBeta=beta,
+        LearnableDomainScale=learnable_domain_scale,
+        LearnableDomainScaleLR=domain_scale_lr,
+        # =====
         TaskDomain=task_d,
         TaskClass=task_c,
         TasksPerStep=task_per_step,
@@ -76,58 +80,58 @@ if __name__ == '__main__':
     )
 
     domain_specific_loader, val_k = get_domain_specific_dataloader(
-        root_dir=train_dir, 
-        domain=source_domain, 
-        classes=known_classes, 
-        classes_partition=classes_partition, 
-        batch_size=sub_batch_size, 
-        small_img=small_img, 
+        root_dir=train_dir,
+        domain=source_domain,
+        classes=known_classes,
+        classes_partition=classes_partition,
+        batch_size=sub_batch_size,
+        small_img=small_img,
         crossval=crossval and random_split
     )
 
     if crossval and val_k == None:
         val_k, *_ = get_dataloader(
-            root_dir=val_dir, 
-            domain=source_domain, 
-            classes=known_classes, 
-            batch_size=batch_size, 
-            get_domain_label=False, 
-            get_class_label=True, 
-            instr="val", 
-            small_img=small_img, 
-            shuffle=False, 
-            drop_last=False, 
+            root_dir=val_dir,
+            domain=source_domain,
+            classes=known_classes,
+            batch_size=batch_size,
+            get_domain_label=False,
+            get_class_label=True,
+            instr="val",
+            small_img=small_img,
+            shuffle=False,
+            drop_last=False,
             num_workers=4
         )
 
     test_k, *_ = get_dataloader(
-        root_dir=test_dir, 
-        domain=target_domain, 
-        classes=known_classes, 
-        batch_size=batch_size, 
-        get_domain_label=False, 
-        get_class_label=True, 
-        instr="test", 
-        small_img=small_img, 
-        shuffle=False, 
-        drop_last=False, 
+        root_dir=test_dir,
+        domain=target_domain,
+        classes=known_classes,
+        batch_size=batch_size,
+        get_domain_label=False,
+        get_class_label=True,
+        instr="test",
+        small_img=small_img,
+        shuffle=False,
+        drop_last=False,
         num_workers=4
     )
 
     if len(unknown_classes) > 0:
         test_u, *_ = get_dataloader(
-            root_dir=test_dir, 
-            domain=target_domain, 
-            classes=unknown_classes, 
-            batch_size=batch_size, 
-            get_domain_label=False, 
-            get_class_label=False, 
-            instr="test", 
-            small_img=small_img, 
-            shuffle=False, 
-            drop_last=False, 
+            root_dir=test_dir,
+            domain=target_domain,
+            classes=unknown_classes,
+            batch_size=batch_size,
+            get_domain_label=False,
+            get_class_label=False,
+            instr="test",
+            small_img=small_img,
+            shuffle=False,
+            drop_last=False,
             num_workers=4
-        )   
+        )
     else:
         test_u = None
 
@@ -145,19 +149,20 @@ if __name__ == '__main__':
     elif net_name == "convnet":
         net = muticlassifier(net=ConvNet(), num_classes=num_classes, feature_dim=256)
     elif net_name == 'gfnet':
-        net = muticlassifier(net=gfnet_fast("/data0/xiran/MEDIC-plus-vit/save/model/pretrain/gfnet-h-ti.pth"), num_classes=num_classes, feature_dim=512)
+        net = muticlassifier(net=gfnet_fast("/data0/xiran/MEDIC-plus-vit/save/model/pretrain/gfnet-h-ti.pth"),
+                             num_classes=num_classes, feature_dim=512)
 
     net = net.to(device)
-    
+
     if optimize_method == 'SGD':
         optimizer = get_optimizer(net=net, instr=optimize_method, lr=lr, nesterov=nesterov)
-        scheduler = get_scheduler(optimizer=optimizer, instr=schedule_method, step_size=int(num_epoch*0.8), gamma=0.1)
+        scheduler = get_scheduler(optimizer=optimizer, instr=schedule_method, step_size=int(num_epoch * 0.8), gamma=0.1)
     elif optimize_method in ['Adam', 'AdamW']:
         optimizer = get_optimizer(net=net, instr=optimize_method, lr=lr)
         scheduler = types.SimpleNamespace(step=lambda: 0)
 
     if num_epoch_before != 0:
-        logger.log('Loading state dict...')  
+        logger.log('Loading state dict...')
         if save_best_test == False:
             net.load_state_dict(torch.load(model_val_path))
         else:
@@ -168,18 +173,17 @@ if __name__ == '__main__':
             NumEpochBefore=num_epoch_before
         )
 
-
-    logger.log('Start training...')  
+    logger.log('Start training...')
 
     recall = {
         'va': 0,
         'ta': 0,
-        'oscrc': 0, 
+        'oscrc': 0,
         'oscrb': 0,
-        'bva': 0, 
-        'bvta': 0, 
+        'bva': 0,
+        'bvta': 0,
         'bvt': [],
-        'bta': 0, 
+        'bta': 0,
         'btt': []
     }
 
@@ -190,15 +194,17 @@ if __name__ == '__main__':
     if without_bcls:
         ovaloss = lambda *args: 0
 
-
-    task_pool = get_task_pool(task_d=task_d, task_c=task_c, domain_index_list=domain_index_list, group_index_list=group_index_list, group_length_list=group_length_list, net=net, domain_specific_loader=domain_specific_loader, device=device, mode=selection_mode)
-   
+    task_pool = get_task_pool(task_d=task_d, task_c=task_c, domain_index_list=domain_index_list,
+                              group_index_list=group_index_list, group_length_list=group_length_list, net=net,
+                              domain_specific_loader=domain_specific_loader, device=device, mode=selection_mode, shuffle=domain_shuffle)
 
     fast_parameters = list(net.parameters())
     load_fast_weights(net, None)
     net.zero_grad()
 
-    
+    # Note: add
+    grads_history = []
+
     for epoch in range(num_epoch_before, num_epoch):
 
         net.train()
@@ -206,34 +212,37 @@ if __name__ == '__main__':
         step_index = 0
         input_sum = []
         label_sum = []
+        step_domains = []
 
         for domain_index, group_index in task_pool:
-        
+
             for i in domain_index:
                 domain_specific_loader[i].keep(group_index)
-                input, label = domain_specific_loader[i].next(batch_size=batch_size//len(domain_index))
+                input, label = domain_specific_loader[i].next(batch_size=batch_size // len(domain_index))
                 domain_specific_loader[i].reset()
 
                 input = input.to(device)
                 label = label.to(device)
                 input_sum.append(input)
                 label_sum.append(label)
-                
+
             task_count = (task_count + 1) % task_per_step[step_index]
             if task_count == 0:
 
                 input_sum = torch.cat(input_sum, dim=0)
                 label_sum = torch.cat(label_sum, dim=0)
 
-                grad = compute_gradient(net=net, fast_parameters=fast_parameters, input=input_sum, label=label_sum, criterion=criterion, ovaloss=ovaloss, weight=task_per_step[step_index])
+                grad = compute_gradient(net=net, fast_parameters=fast_parameters, input=input_sum, label=label_sum,
+                                        criterion=criterion, ovaloss=ovaloss, weight=task_per_step[step_index])
+                grads_history.append(grad)
+                step_domains.append(list(domain_index))
                 fast_parameters = update_fast_weights("reptile", net=net, grad=grad, meta_lr=meta_lr)
 
-                if algorithm == 'medic':
+                if algorithm in ['medic', 'arith_prob']:
                     pass
-                    
+
                 elif algorithm == 'arith':
                     accumulate_meta_grads("arith", net=net, grad=grad, meta_lr=meta_lr, eta=weight_per_step[step_index])
-
 
                 input_sum = []
                 label_sum = []
@@ -241,37 +250,44 @@ if __name__ == '__main__':
 
         if algorithm == 'medic':
             accumulate_meta_grads("reptile", net=net, meta_lr=meta_lr)
-            
+
+        # Note: add 'arith_prob' 
+        elif algorithm == 'arith_prob':
+            accumulate_meta_grads("arith_prob", net=net, grads_history=grads_history, meta_lr=meta_lr,
+                                  bayes_ema=bayes_ema, beta=beta, step_domains=step_domains,
+                                  domain_count=num_domain,
+                                  learnable_domain_scale=learnable_domain_scale,
+                                  domain_scale_lr=domain_scale_lr)
+
         elif algorithm == 'arith':
             pass
 
-
         # update with original optimizers
-        optimizer.step()  
-
-        
-     
+        optimizer.step()
 
         fast_parameters = list(net.parameters())
         load_fast_weights(net, None)
         net.zero_grad()
 
-        task_pool = get_task_pool(task_d=task_d, task_c=task_c, domain_index_list=domain_index_list, group_index_list=group_index_list, group_length_list=group_length_list, net=net, domain_specific_loader=domain_specific_loader, device=device, mode=selection_mode) 
+        grads_history.clear()
 
-        if (epoch+1) % eval_step == 0:      
-       
-            net.eval()  
+        task_pool = get_task_pool(task_d=task_d, task_c=task_c, domain_index_list=domain_index_list,
+                                  group_index_list=group_index_list, group_length_list=group_length_list, net=net,
+                                  domain_specific_loader=domain_specific_loader, device=device, mode=selection_mode, shuffle=domain_shuffle)
 
-            recall['va'], recall['ta'], recall['oscrc'], recall['oscrb'] = eval_all(net, val_k, test_k, test_u, log_path, epoch, device)
+        if (epoch + 1) % eval_step == 0:
+            net.eval()
+
+            recall['va'], recall['ta'], recall['oscrc'], recall['oscrb'] = eval_all(net, val_k, test_k, test_u,
+                                                                                    log_path, epoch, device)
             update_recall(net, recall, log_path, model_val_path)
 
-            
-        if epoch+1 == renovate_step:
-                logger.log("Reset accuracy history...")
-                recall['bva'] = 0
-                recall['bvta'] = 0
-                recall['bvt'] = []
-                recall['bta'] = 0
-                recall['btt'] = []
+        if epoch + 1 == renovate_step:
+            logger.log("Reset accuracy history...")
+            recall['bva'] = 0
+            recall['bvta'] = 0
+            recall['bvt'] = []
+            recall['bta'] = 0
+            recall['btt'] = []
 
         scheduler.step()
