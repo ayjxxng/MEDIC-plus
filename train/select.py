@@ -102,7 +102,7 @@ def class_selection(T, C, n):
     return group_split
 
 
-def get_task_pool(task_d, task_c, domain_index_list, group_index_list, group_length_list, net=None, domain_specific_loader=None, device=None, mode='random'):
+def get_task_pool(task_d, task_c, domain_index_list, group_index_list, group_length_list, net=None, domain_specific_loader=None, device=None, mode='random', shuffle=True):
     
     task_pool = []
     domain_split = divide_list(shuffle_list(domain_index_list), task_d)
@@ -138,4 +138,4 @@ def get_task_pool(task_d, task_c, domain_index_list, group_index_list, group_len
         for ig in group_split:
             task_pool.append((id, ig))
 
-    return shuffle_list(task_pool)
+    return shuffle_list(task_pool) if shuffle else task_pool
