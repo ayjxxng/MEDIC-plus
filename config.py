@@ -93,7 +93,15 @@ def get_args():
     #     'wine_glass', 'wristwatch', 'yoga', 'zebra', 'zigzag'
     #     ])
     # parser.add_argument('--unknown-classes', nargs='+', default=[])
-
+    
+    #============= Note: Custum arg.
+    parser.add_argument('--domain-shuffle', default='true')  # true, false
+    parser.add_argument('--bayes-ema', type=float, default=0.9)  # EMA coeff.
+    parser.add_argument('--beta', type=float, default=0.4)
+    parser.add_argument('--learnable-domain-scale', action='store_true')
+    parser.add_argument('--domain-scale-lr', type=float, default=None)
+    # =============
+    
     parser.add_argument('--random-split', action='store_true')
     parser.add_argument('--gpu', default='0')
     parser.add_argument('--batch-size', type=int, default=16)
@@ -163,6 +171,14 @@ save_later = args.save_later
 save_best_test = args.save_best_test
 num_epoch_before = args.num_epoch_before
 crossval = True
+
+#============= Note: Add.
+domain_shuffle = True if args.domain_shuffle.lower() == 'true' else False
+bayes_ema = args.bayes_ema
+beta = args.beta
+learnable_domain_scale = args.learnable_domain_scale
+domain_scale_lr = args.domain_scale_lr if args.domain_scale_lr is not None else (lr * 0.5)
+#=============
 
 if dataset == 'PACS':
     train_dir = '/data/datasets/PACS'
